@@ -12,6 +12,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> movimientos = [];
+  List<Map<String, dynamic>> movimientosFiltrados = [];
+
+  String filtro = 'Todos';
 
   double totalIngresos = 0;
   double totalGastos = 0;
@@ -40,18 +43,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       movimientos = data;
+
+      if (filtro == 'Todos') {
+        movimientosFiltrados = data;
+      } else {
+        movimientosFiltrados =
+            data.where((m) => m['tipo'] == filtro).toList();
+      }
+
       totalIngresos = ingresos;
       totalGastos = gastos;
     });
   }
 
+  void aplicarFiltro(String valor) {
+    setState(() {
+      filtro = valor;
+
+      if (filtro == 'Todos') {
+        movimientosFiltrados = movimientos;
+      } else {
+        movimientosFiltrados =
+            movimientos.where((m) => m['tipo'] == filtro).toList();
+      }
+    });
+  }
+
   Future<void> eliminarMovimiento(int id) async {
     await DatabaseHelper.instance.deleteMovimiento(id);
-    cargarDatos();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Movimiento eliminado')),
-    );
+    await cargarDatos();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Movimiento eliminado'),
+        ),
+      );
+    }
   }
 
   @override
@@ -63,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Presupuesto'),
         centerTitle: true,
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -71,21 +99,21 @@ class _HomeScreenState extends State<HomeScreen> {
             Card(
               child: ListTile(
                 title: const Text('Total Ingresos'),
-                trailing: Text('B/. $totalIngresos'),
+                trailing: Text('B/. ${totalIngresos.toStringAsFixed(2)}'),
               ),
             ),
 
             Card(
               child: ListTile(
                 title: const Text('Total Gastos'),
-                trailing: Text('B/. $totalGastos'),
+                trailing: Text('B/. ${totalGastos.toStringAsFixed(2)}'),
               ),
             ),
 
             Card(
               child: ListTile(
                 title: const Text('Saldo Disponible'),
-                trailing: Text('B/. $saldo'),
+                trailing: Text('B/. ${saldo.toStringAsFixed(2)}'),
               ),
             ),
 
@@ -101,15 +129,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 10),
 
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () => aplicarFiltro('Todos'),
+                  child: const Text('Todos'),
+                ),
+                ElevatedButton(
+                  onPressed: () => aplicarFiltro('Ingreso'),
+                  child: const Text('Ingresos'),
+                ),
+                ElevatedButton(
+                  onPressed: () => aplicarFiltro('Gasto'),
+                  child: const Text('Gastos'),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
             Expanded(
-              child: movimientos.isEmpty
+              child: movimientosFiltrados.isEmpty
                   ? const Center(
-                      child: Text('No hay movimientos registrados'),
+                      child: Text(
+                        'No hay movimientos registrados',
+                      ),
                     )
                   : ListView.builder(
-                      itemCount: movimientos.length,
+                      itemCount: movimientosFiltrados.length,
                       itemBuilder: (context, index) {
-                        final item = movimientos[index];
+                        final item = movimientosFiltrados[index];
 
                         return Dismissible(
                           key: Key(item['id'].toString()),
@@ -132,19 +182,23 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Card(
                             child: ListTile(
                               title: Text(item['categoria']),
-                              subtitle: Text(item['descripcion'] ?? ''),
-                              trailing: Text(
-                                '${item['tipo']} B/. ${item['monto']}',
+
+                              subtitle: Text(
+                                item['descripcion'] ?? '',
                               ),
 
-                              // EDITAR
+                              trailing: Text(
+                                '${item['tipo']}  B/. ${item['monto']}',
+                              ),
+
                               onTap: () async {
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         EditMovimientoScreen(
-                                            movimiento: item),
+                                      movimiento: item,
+                                    ),
                                   ),
                                 );
 
